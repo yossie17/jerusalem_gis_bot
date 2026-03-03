@@ -1,0 +1,1 @@
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy && env | grep -i proxy || echo "✓ All proxy variables cleared"
