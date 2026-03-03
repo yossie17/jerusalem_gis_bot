@@ -22,12 +22,13 @@ def get_building_info(address_text):
     logger.info(f"🛰️ GIS Request Start: {address_text}")
     
     try:
-        # ניתוח הכתובת - רחוב ומספר
         parts = address_text.rsplit(' ', 1)
         street = parts[0]
         number = parts[1] if len(parts) > 1 else ""
         
         url = "https://gisviewer.jerusalem.muni.il/arcgis/rest/services/BaseLayers/MapServer/10/query"
+        
+        # הפרמטרים נשארים זהים
         params = {
             'where': f"StreetName1 LIKE '%{street}%' AND BldNum LIKE '{number}%'",
             'outFields': 'StreetName1,BldNum,NUM_FLOORS,NUM_APTS_C,NUM_BUSNS_',
@@ -35,33 +36,32 @@ def get_building_info(address_text):
             'returnGeometry': 'false'
         }
         
-        # הוספת Headers כדי לעקוף חסימת 403 (התחזות לדפדפן)
+        # Headers מורחבים - חיקוי מושלם של דפדפן
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://gisviewer.jerusalem.muni.il/'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer': 'https://gisviewer.jerusalem.muni.il/html5viewer/index.html?viewer=jerugis',
+            'Connection': 'keep-alive'
         }
         
-        response = requests.get(url, params=params, headers=headers, timeout=15, verify=False)
-        duration = time.time() - start_time
+        # שימוש ב-Session כדי לשמור על עקביות (לפעמים עוזר לעקוף חסימות)
+        session = requests.Session()
+        response = session.get(url, params=params, headers=headers, timeout=15, verify=False)
         
+        duration = time.time() - start_time
         logger.info(f"⏱️ GIS Response in {duration:.2f}s (Status: {response.status_code})")
         
-        if response.status_code != 200:
-            logger.error(f"❌ שגיאת שרת: {response.status_code}")
+        if response.status_code == 403:
+            logger.error("🚫 עדיין חסום (403). השרת מזהה את ה-IP של Railway.")
             return None
 
         data = response.json()
         features = data.get('features', [])
-        
-        if features:
-            logger.info(f"✅ נמצאו נתונים ב-GIS")
-            return features[0]['attributes']
-        
-        logger.warning(f"❓ לא נמצאו תוצאות לכתובת: {address_text}")
-        return None
+        return features[0]['attributes'] if features else None
 
     except Exception as e:
-        logger.error(f"❌ שגיאה בעיבוד הבקשה: {e}")
+        logger.error(f"❌ שגיאה: {e}")
         return None
 
 # 3. טיפול בפקודת /start
